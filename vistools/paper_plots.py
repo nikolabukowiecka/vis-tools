@@ -70,7 +70,7 @@ for folder in folders:
     jetEfficiency10[folder] = jet_eff_10
     jetEfficiency50[folder] = jet_eff_50
 
-    print(f"Mean jet efficiency at 5 for {folder} (Mdot_5, Edot_5): {np.mean(jet_eff_5)}")
+    # print(f"Mean jet efficiency at 5 for {folder} (Mdot_5, Edot_5): {np.mean(jet_eff_5)}")
     # print(f"Mean jet efficiency at 10 for {folder} (Mdot_5, Edot_10): {np.mean(jet_eff_10)}")
     # print(f"Mean jet efficiency at 50 for {folder} (Mdot_5, Edot_50): {np.mean(jet_eff_50)}")
 
@@ -234,7 +234,7 @@ for folder in folders:
     spinToHorizon = 1.0 + np.sqrt(1.0 - spinDict[folder]**2)
     if folder == 'KerrLow' or folder == 'KerrMid':
         Omega_H = np.abs(spinDict[folder]) / (2*spinToHorizon) #Omega-H <-> horizonAngularVelocity
-        print(f"{folder}, {spinToHorizon}, {Omega_H}")
+        #print(f"{folder}, {spinToHorizon}, {Omega_H}")
     # elif folder == 'KHMid':
     #     #evaulated for theta = pi/2 equatorial observer
     #     Omega_H = (2.78207 * spinDict[folder] * (0.359445 - 0.359445 * (1 - 0.431002 / (0.129201 + 2 * L**4))) 
@@ -583,20 +583,20 @@ for folder in folders:
             beta_mu = np.concatenate([beta_mu, -beta_mu])
             alpha_mu = np.concatenate([alpha_mu, alpha_mu])
             dict_ring = ring_metrics(alpha_mu, beta_mu)
-            print(
-                f"Critical curve metrics, theoretical, {folder}: "
-                f"D_alpha={dict_ring['D_alpha']:.3f}, D_beta={dict_ring['D_beta']:.3f}, D_alpha/D_beta={(dict_ring['D_alpha']/dict_ring['D_beta']):.3f}, x_c={dict_ring['x_c']:.3f}, "
-                #f"A_disp={dict_ring['A_disp']:.4f}, A_alpha={dict_ring['A_alpha']:.4f}, A_shape={dict_ring['A_shape']:.4f}"
-            )
+            # print(
+            #     f"Critical curve metrics, theoretical, {folder}: "
+            #     f"D_alpha={dict_ring['D_alpha']:.3f}, D_beta={dict_ring['D_beta']:.3f}, D_alpha/D_beta={(dict_ring['D_alpha']/dict_ring['D_beta']):.3f}, x_c={dict_ring['x_c']:.3f}, "
+            #     #f"A_disp={dict_ring['A_disp']:.4f}, A_alpha={dict_ring['A_alpha']:.4f}, A_shape={dict_ring['A_shape']:.4f}"
+            # )
 
 for folder in folders:
     if folder in inner_params:
         alpha_mu_IS, beta_mu_IS, color = inner_params[folder]
         dict_ring2 = ring_metrics(alpha_mu_IS, beta_mu_IS)
-        print(
-                 f"Inner shadow metrics, theoretical, {folder}: "
-                 f"D_alpha={dict_ring2['D_alpha']:.3f}, D_beta={dict_ring2['D_beta']:.3f}, D_alpha/D_beta={(dict_ring2['D_alpha']/dict_ring2['D_beta']):.3f}, x_c={dict_ring2['x_c']:.3f}, "
-            )
+        # print(
+        #          f"Inner shadow metrics, theoretical, {folder}: "
+        #          f"D_alpha={dict_ring2['D_alpha']:.3f}, D_beta={dict_ring2['D_beta']:.3f}, D_alpha/D_beta={(dict_ring2['D_alpha']/dict_ring2['D_beta']):.3f}, x_c={dict_ring2['x_c']:.3f}, "
+        #     )
         #print("Inner shadow metrics, theoretical: FROM PRASHANT - help with a fix")
         
 #subdir = ["n_-1_400", "n_0_400", "n_1_400"] 
@@ -745,6 +745,28 @@ curves = curvesDict
 #subdirs = ["n_-1_400"]
 subdirs = ["n_-1_res_400", "n_0_res_400", "n_1_res_400"]
 #subdirs = ["n_0_res_400"]
+
+# Averaged-curves y-axis mode.
+AVERAGED_CURVES_YSCALE = "linear"
+if AVERAGED_CURVES_YSCALE not in ("linear", "log"):
+    raise ValueError("AVERAGED_CURVES_YSCALE must be 'linear' or 'log'")
+
+# Split-log treatment (used when AVERAGED_CURVES_YSCALE == "log").
+# n=-1,0: slightly deeper y-min to show central depression better.
+# n=1: stronger positive floor and masking below floor to avoid triangular/fill-looking artifacts.
+LOG_SUBDIR_CFG = {
+    "n_-1_res_400": {"floor_pct": 0.8, "ymin_scale": 0.70, "mask_below_floor": False, "line_width_scale": 1.00, "abs_floor": None},
+    "n_0_res_400": {"floor_pct": 0.8, "ymin_scale": 0.70, "mask_below_floor": False, "line_width_scale": 1.00, "abs_floor": None},
+    "n_1_res_400": {"floor_pct": 0.8, "ymin_scale": 0.70, "mask_below_floor": False, "line_width_scale": 1.00, "abs_floor": None},
+}
+for _subdir in subdirs:
+    cfg = LOG_SUBDIR_CFG.get(_subdir, {})
+    floor_pct = cfg.get("floor_pct", 1.0)
+    ymin_scale = cfg.get("ymin_scale", 1.0)
+    if floor_pct <= 0 or floor_pct >= 100:
+        raise ValueError(f"Invalid floor_pct for {_subdir}: {floor_pct}")
+    if ymin_scale <= 0:
+        raise ValueError(f"Invalid ymin_scale for {_subdir}: {ymin_scale}")
 
 for folder in folders:
     for subdir in subdirs:
@@ -937,9 +959,138 @@ for folder in folders:
         else:
             averaged_curves[folder][subdir] = {'polar': None, 'horizontal': None, 'x': None}
 
+def robust_ylim(value_arrays, lower_pct=0.5, upper_pct=99.5, pad_fraction=0.08):
+    finite_values = []
+    for arr in value_arrays:
+        arr = np.asarray(arr, dtype=float)
+        arr = arr[np.isfinite(arr)]
+        if arr.size:
+            finite_values.append(arr)
+    if not finite_values:
+        return None
+
+    all_values = np.concatenate(finite_values)
+    y_low = np.percentile(all_values, lower_pct)
+    # Keep peaks fully visible: never clip the upper limit by percentile.
+    y_high = np.nanmax(all_values)
+    if not np.isfinite(y_low) or not np.isfinite(y_high) or y_high <= y_low:
+        y_low = np.nanmin(all_values)
+        y_high = np.nanmax(all_values)
+        if not np.isfinite(y_low) or not np.isfinite(y_high) or y_high <= y_low:
+            return None
+
+    pad = (y_high - y_low) * pad_fraction
+    return (y_low - pad, y_high + pad)
+
+def get_positive_floor(value_arrays, floor_pct=1.0):
+    pos_vals = []
+    for arr in value_arrays:
+        arr = np.asarray(arr, dtype=float)
+        arr = arr[np.isfinite(arr) & (arr > 0)]
+        if arr.size:
+            pos_vals.append(arr)
+    if not pos_vals:
+        return None
+    floor = np.percentile(np.concatenate(pos_vals), floor_pct)
+    if not np.isfinite(floor) or floor <= 0:
+        return None
+    return float(floor)
+
+def scale_aware_ylim(ylim, yscale, value_arrays=None, log_floor_pct=1.0, abs_floor=None):
+    if ylim is None:
+        return None
+    y_low, y_high = ylim
+    if yscale == "log":
+        pos_floor = get_positive_floor(value_arrays or [], floor_pct=log_floor_pct)
+        if abs_floor is not None:
+            pos_floor = max(pos_floor or 0.0, float(abs_floor))
+        if pos_floor is None or not np.isfinite(pos_floor) or pos_floor <= 0:
+            pos_floor = np.finfo(float).tiny
+        y_low = max(y_low, pos_floor)
+        if y_high <= y_low:
+            return None
+    return (y_low, y_high)
+
+def prepare_curve_for_plot(y_values, yscale, log_floor=None, mask_below_floor=False):
+    y_plot = np.asarray(y_values, dtype=float).copy()
+    if yscale != "log":
+        return y_plot
+    if log_floor is None or not np.isfinite(log_floor) or log_floor <= 0:
+        log_floor = np.finfo(float).tiny
+    if mask_below_floor:
+        y_plot[y_plot < log_floor] = np.nan
+    else:
+        y_plot = np.where(y_plot > 0, y_plot, np.nan)
+        y_plot = np.maximum(y_plot, log_floor)
+    return y_plot
+
+all_polar_curves = []
+all_horizontal_curves = []
+for folder in folders:
+    for subdir in subdirs:
+        curves_df = averaged_curves[folder][subdir]
+        if curves_df['polar'] is not None:
+            all_polar_curves.append(curves_df['polar'].values)
+        if curves_df['horizontal'] is not None:
+            all_horizontal_curves.append(curves_df['horizontal'].values)
+
+# Global limits for linear mode (keeps cross-n comparability when linear).
+linear_polar_ylim = robust_ylim(all_polar_curves)
+linear_horizontal_ylim = robust_ylim(all_horizontal_curves)
+linear_polar_ylim = scale_aware_ylim(linear_polar_ylim, "linear", all_polar_curves)
+linear_horizontal_ylim = scale_aware_ylim(linear_horizontal_ylim, "linear", all_horizontal_curves)
+
+# Per-n limits for log mode (avoids one shared range crushing contrast).
+log_polar_ylim = {}
+log_horizontal_ylim = {}
+log_floor_by_subdir_polar = {}
+log_floor_by_subdir_horizontal = {}
+for subdir in subdirs:
+    cfg = LOG_SUBDIR_CFG.get(subdir, {})
+    floor_pct = cfg.get("floor_pct", 1.0)
+    ymin_scale = cfg.get("ymin_scale", 1.0)
+    abs_floor = cfg.get("abs_floor", None)
+
+    subdir_polar = []
+    subdir_horizontal = []
+    for folder in folders:
+        curves_df = averaged_curves[folder][subdir]
+        if curves_df['polar'] is not None:
+            subdir_polar.append(curves_df['polar'].values)
+        if curves_df['horizontal'] is not None:
+            subdir_horizontal.append(curves_df['horizontal'].values)
+    p_ylim = robust_ylim(subdir_polar)
+    h_ylim = robust_ylim(subdir_horizontal)
+    log_polar_ylim[subdir] = scale_aware_ylim(
+        p_ylim, "log", subdir_polar, log_floor_pct=floor_pct, abs_floor=abs_floor
+    )
+    log_horizontal_ylim[subdir] = scale_aware_ylim(
+        h_ylim, "log", subdir_horizontal, log_floor_pct=floor_pct, abs_floor=abs_floor
+    )
+
+    # Apply optional deeper lower limit for depression visibility.
+    if log_polar_ylim[subdir] is not None:
+        y0, y1 = log_polar_ylim[subdir]
+        log_polar_ylim[subdir] = (y0 * ymin_scale, y1)
+    if log_horizontal_ylim[subdir] is not None:
+        y0, y1 = log_horizontal_ylim[subdir]
+        log_horizontal_ylim[subdir] = (y0 * ymin_scale, y1)
+
+    floor_p = get_positive_floor(subdir_polar, floor_pct=floor_pct)
+    floor_h = get_positive_floor(subdir_horizontal, floor_pct=floor_pct)
+    if abs_floor is not None:
+        floor_p = max(floor_p or 0.0, float(abs_floor))
+        floor_h = max(floor_h or 0.0, float(abs_floor))
+    log_floor_by_subdir_polar[subdir] = floor_p
+    log_floor_by_subdir_horizontal[subdir] = floor_h
+
 for subdir in subdirs:
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
     ax_polar, ax_horizontal = axes
+    subdir_yscale = AVERAGED_CURVES_YSCALE
+    subdir_cfg = LOG_SUBDIR_CFG.get(subdir, {})
+    line_width_scale = subdir_cfg.get("line_width_scale", 1.0)
+    mask_below_floor = bool(subdir_cfg.get("mask_below_floor", False))
 
     for folder in folders:
         curves_df = averaged_curves[folder][subdir]
@@ -947,8 +1098,19 @@ for subdir in subdirs:
         curves_polar = curves_df['polar'].values
         curves_horizontal = curves_df['horizontal'].values
         style = plot_style[folder].copy()
+        base_lw = style.get('linewidth', 1.5)
+        style['linewidth'] = base_lw * line_width_scale
 
-        
+        curves_polar_plot = prepare_curve_for_plot(
+            curves_polar, subdir_yscale,
+            log_floor=log_floor_by_subdir_polar.get(subdir),
+            mask_below_floor=mask_below_floor
+        )
+        curves_horizontal_plot = prepare_curve_for_plot(
+            curves_horizontal, subdir_yscale,
+            log_floor=log_floor_by_subdir_horizontal.get(subdir),
+            mask_below_floor=mask_below_floor
+        )
 
         #Edges - Theoretical ones overlaid on the images
         #slice through the critical curve:
@@ -959,11 +1121,13 @@ for subdir in subdirs:
         ax_polar.axvline(np.max(beta_mu), color=style['color'], linestyle='--', alpha=0.6)
 
         # --- Polar curve ---
-        ax_polar.plot(x, curves_polar, color=style['color'],
+        ax_polar.plot(x, curves_polar_plot, color=style['color'],
                       linewidth=style['linewidth'], alpha=0.8, label=f"{style['label']}")
         D_polar_global, dict_polar_global = shadow_diameter_from_gradient(x, curves_polar, derType = 'global')
         xL_global = dict_polar_global['xL']
         xR_global = dict_polar_global['xR']
+
+        #ax_polar.set_yscale('log')
 
         #Edges - Calculated form the images overlaid on the images
         # ax_polar.axvline(xL_global, color=style['color'], linestyle='--', alpha=0.6)
@@ -971,9 +1135,23 @@ for subdir in subdirs:
         # print(f"Shadow diameter, polar, from the curves, {folder} = {D_polar}")
 
         # --- Horizontal curve ---
-        ax_horizontal.semilogy(x, curves_horizontal, color=style['color'],
-                           linewidth=style['linewidth'], alpha=0.8, label=f"{style['label']}")
-        if (subdir == "n_1_res_400" or "n_0_res_400"):
+        import matplotlib.ticker as mticker
+
+        ax_horizontal.plot(x, curves_horizontal_plot, color=style['color'], 
+                           linewidth=style['linewidth'], alpha=0.8, label=style['label'])
+
+        #ax_horizontal.set_yscale('log')
+
+        # # Only label full decades
+        # ax_horizontal.yaxis.set_major_locator(mticker.LogLocator(base=10, subs=(1.0,)))
+        # ax_horizontal.yaxis.set_major_formatter(mticker.LogFormatterMathtext(base=10, labelOnlyBase=True))
+
+        # # No minor labels
+        # ax_horizontal.yaxis.set_minor_locator(mticker.NullLocator())
+        # ax_horizontal.yaxis.set_minor_formatter(mticker.NullFormatter())
+
+
+        if subdir in ("n_-1_res_400", "n_0_res_400", "n_1_res_400"):
             D_horizontal_global, dict_horizontal_global = shadow_diameter_from_gradient(x, curves_horizontal, derType = 'global')
             #print(f"Photon ring inner edge, horizontal, from the image, {folder} = {D_horizontal_global}")
             
@@ -995,7 +1173,7 @@ for subdir in subdirs:
         #ax_horizontal.axvline(xL_global, color=style['color'], linestyle='--', alpha=0.6)
         #ax_horizontal.axvline(xR_global, color=style['color'], linestyle='--', alpha=0.6)
 
-        if (subdir == "n_1_res_400" or subdir == "n_0_res_400" ):
+        if (subdir == "n_-1_res_400" or subdir == "n_0_res_400" or subdir == "n_1_res_400"):
             D_horizontal_local, dict_horizontal_local = shadow_diameter_from_gradient(x, curves_horizontal, derType = 'local')
 
             #Edges local - Calculated form the images overlaid on the images
@@ -1033,7 +1211,7 @@ for subdir in subdirs:
 
             return out
         
-        if (subdir == "n_1_res_400" or subdir == "n_0_res_400"):
+        if (subdir == "n_-1_res_400" or subdir == "n_0_res_400" or subdir == "n_1_res_400"):
             dict_ring_image = ring_metric_image(dict_horizontal_global, dict_polar_global)
 
             print(
@@ -1110,6 +1288,7 @@ for subdir in subdirs:
             #             f"D_alpha={dict_ring['D_alpha']:.3f}, x_c={dict_ring['x_c']:.3f}, "
             #             f"A_disp={dict_ring['A_disp']:.4f}, A_shape={dict_ring['A_shape']:.4f}"
         #         )
+    
 
     # Titles, labels, legends
     ax_polar.set_title(f"n = {subdir.split('_')[1]}, polar averaged curve")
@@ -1124,11 +1303,35 @@ for subdir in subdirs:
     ax_polar.legend(loc='best', fontsize=10, frameon=True)
     ax_horizontal.legend(loc='best', fontsize=10, frameon=True)
 
+    if subdir_yscale == "log":
+        ax_polar.set_yscale("log")
+        ax_horizontal.set_yscale("log")
+
+    if subdir_yscale == "linear":
+        if linear_polar_ylim is not None:
+            ax_polar.set_ylim(*linear_polar_ylim)
+        if linear_horizontal_ylim is not None:
+            ax_horizontal.set_ylim(*linear_horizontal_ylim)
+    else:
+        ax_polar.set_ylim(1e-9, 1e-3)
+        ax_horizontal.set_ylim(1e-9, 1e-3)
+
     for ax in (ax_polar, ax_horizontal):
         ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=12))
-        ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=12))
+        if subdir_yscale == "linear":
+            ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=12))
+        else:
+            ax.yaxis.set_major_locator(ticker.LogLocator(base=10, subs=(1.0,)))
+            ax.yaxis.set_minor_locator(ticker.LogLocator(base=10, subs=np.arange(2, 10) * 0.1))
+            ax.yaxis.set_minor_formatter(ticker.NullFormatter())
         ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
-        #ax.grid(True, alpha=0.3)
+        # ax_polar.set_yscale('log')
+        # ax_polar.set_yticks([1e-5, 2e-5, 5e-5, 1e-4])
+        # ax_polar.yaxis.set_minor_locator(mticker.NullLocator())
+        # ax_horizontal.set_yscale('log')
+        # ax_horizontal.set_yticks([1e-5, 2e-5, 5e-5, 1e-4])
+        # ax_horizontal.yaxis.set_minor_locator(mticker.NullLocator())
+        # ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
     fig_path = os.path.join(averagedFigDir, f"averaged_curves_{subdir}.png")
@@ -1173,9 +1376,9 @@ keys = list(observablesData[folders[0]].keys())
 
 fig, axes = plt.subplots(3, 2, figsize=(12, 8))
 axes = axes.flatten()
-subdirsMuas = ["n_-1_400_20muas"]
+subdirsMuas = ["n_1_400_20muas"]
 #subdirs = ["n_-1_res_400"]
-subdirs = ["n_-1_400"]
+subdirs = ["n_1_400"]
 
 # ============================================================
 # 1) BETA MODES IN PANELS 0–3
@@ -1784,4 +1987,3 @@ print(f"Movie saved to {output_movie}")
 
 '''
 ####################################################################################################################################################################################
-
