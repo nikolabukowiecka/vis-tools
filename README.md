@@ -410,13 +410,18 @@ Paper:
 Software archive:
 
 ```bibtex
-@software{vis_tools_zenodo,
-  author    = {Bukowiecka, Nikola},
-  title     = {vis-tools: GRMHD and polarized radiative-transfer analysis workflow for Kerr-Hayward EHT simulations},
-  year      = {2026},
-  publisher = {Zenodo},
-  doi       = {},
-  url       = {}
+@software{nikola_bukowiecka_2026_20594260,
+  author       = {Nikola Bukowiecka},
+  title        = {nikolabukowiecka/vis-tools: First release of vis-
+                   tools - post-processing and analysis package for
+                   non-Kerr spacetimes in GRMHD+GRRT (KHARMA+ipole)
+                  },
+  month        = jun,
+  year         = 2026,
+  publisher    = {Zenodo},
+  version      = {v1},
+  doi          = {10.5281/zenodo.20594260},
+  url          = {https://doi.org/10.5281/zenodo.20594260},
 }
 ```
 
