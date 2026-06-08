@@ -396,14 +396,14 @@ If you use this repository, please cite both the paper and the archived software
 Paper:
 
 ```bibtex
-@misc{bukowiecka2026kerrhaywardeht,
-  title        = {On the observational distinguishability of the Kerr and Kerr-Hayward metrics to EHT},
-  author       = {Bukowiecka, Nikola and Ricarte, Angelo and Kocherlakota, Prashant and Prather, Cora},
-  year         = {2026},
-  eprint       = {2604.06128},
-  archivePrefix= {arXiv},
-  primaryClass = {gr-qc},
-  url          = {https://arxiv.org/abs/2604.06128}
+@misc{bukowiecka2026observationaldistinguishabilitykerrkerrhayward,
+      title={On the observational distinguishability of the Kerr and Kerr-Hayward metrics to EHT}, 
+      author={Nikola Bukowiecka and Angelo Ricarte and Prashant Kocherlakota and Cora Prather},
+      year={2026},
+      eprint={2604.06128},
+      archivePrefix={arXiv},
+      primaryClass={astro-ph.HE},
+      url={https://arxiv.org/abs/2604.06128}, 
 }
 ```
 
